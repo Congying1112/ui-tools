@@ -14,13 +14,23 @@
   </head>
   <body>
     <script type="text/javascript" charset="utf-8">
+      const nowDate = new Date(Date.now());
       const urls = window.location.toString().split("#");
       const dataAll = urls[1] ? JSON.parse(LZString.decompressFromEncodedURIComponent(urls[1])) : {title: 'No Title'};
       const title = dataAll['title'];
-      const data = dataAll['data'] ? dataAll['data'] : [{"status": "1:待处理"}];
+      const initDataItem = {
+        "status": "需求待确认",
+        "createdTime": nowDate,
+        "updatedTime": nowDate,
+        };
+      let data = dataAll['data'] ? dataAll['data'] : [initDataItem];
       if (data[data.length-1]['question']) {
-        data.push({"status": "1:待处理"});
+        data.push(initDataItem);
       }
+      data.forEach(d => {
+        d.createdTime = d.createdTime ? new Date(d.createdTime) : nowDate;
+        d.updatedTime = d.updatedTime ? new Date(d.updatedTime) : nowDate;
+      })
       const onDataChanged = () => {
         webix.message("DataChanged!");
         $$('table').adjustRowHeight("question");
@@ -28,16 +38,23 @@
         const srcData = {title: title, data: dataA};
         window.open(urls[0]+"#"+LZString.compressToEncodedURIComponent(JSON.stringify(srcData)),"_self");
         if (dataA.length == 0 || dataA[dataA.length-1]['question']) {
-          $$("table").add({"status": "1:待处理"});
+          $$("table").add({
+            "status": "需求待确认",
+            "createdTime": new Date(Date.now()),
+            "updatedTime": new Date(Date.now()),
+          });
         }
       };
       const columns = [
-        { id:"index", header:"#", width: 50, sort:"int"},
+        { id: "index", header:"#", width: 50, sort:"int"},
         { id: 'actions', header: "", width: 50, template:"<img class='delbtn'>"},
         { id: 'question', header: ["问题",{content:"textFilter"}], fillspace: 4, editor:"text" },
         { id: 'poster', header: ["提出人",{content:"selectFilter"}], width: 100, editor:"text", sort:"string" },
-        { id: 'status', header: ["状态",{content:"selectFilter"}], width: 150, editor:"select", options: ['1:待处理', '2:设计中，待开发', '3:开发中', '4:待确认', '5:已确认', '9:搁置'], sort:"string"},
-        { id: 'comfirmer', header: ["确认人",{content:"selectFilter"}], width: 100, editor:"text", sort:"string"} ];
+        { id: 'createdTime', header: "提出时间", width: 100, format:webix.Date.dateToStr("%Y-%m-%d"), sort:"date"},
+        { id: 'status', header: ["状态",{content:"selectFilter"}], width: 150, editor:"select", options: [
+          '需求待确认', '已确认，待设计', '设计中', '已设计，待开发', '开发中', '待验收', '已验收', '搁置'], sort:"string"},
+        { id: 'updatedTime', header: "更新时间", width: 100, format: webix.Date.dateToStr("%Y-%m-%d"), sort:"date"}];
+
       webix.ui({
         rows:[
             { view:"template", 
@@ -73,6 +90,10 @@
       });
       $$('table').adjustRowHeight("question");
       $$('table').attachEvent("onDataUpdate", function(id, data){
+        if (data.updatedTime == undefined || Date.now() - data.updatedTime > 1000) {
+          data.updatedTime = new Date(Date.now());
+          $$('table').updateItem(id, data);
+        }
         onDataChanged();
         return true;
       });
