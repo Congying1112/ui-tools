@@ -5,45 +5,75 @@
   <link rel="stylesheet" href="http://cdn.webix.com/edge/webix.css" type="text/css"> 
   <script src="http://cdn.webix.com/edge/webix.js" type="text/javascript"></script>
   <script language="javascript" src="lz-string.js"></script>
+  <style>
+  .delbtn{
+    content: url("./delete-button.png");
+    margin-top: 5px;
+  }
+  </style>
   </head>
   <body>
     <script type="text/javascript" charset="utf-8">
       const urls = window.location.toString().split("#");
-      console.log('data', urls[1]);
       const dataAll = urls[1] ? JSON.parse(LZString.decompressFromEncodedURIComponent(urls[1])) : {title: 'No Title'};
       const title = dataAll['title'];
-      const data = dataAll['data'] ? dataAll['data'] : [];
+      const data = dataAll['data'] ? dataAll['data'] : [{"status": "1:待处理"}];
+      if (data[data.length-1]['question']) {
+        data.push({"status": "1:待处理"});
+      }
+      const onDataChanged = () => {
+        webix.message("DataChanged!");
+        $$('table').adjustRowHeight("question");
+        const dataA = $$('table').serialize();
+        const srcData = {title: title, data: dataA};
+        window.open(urls[0]+"#"+LZString.compressToEncodedURIComponent(JSON.stringify(srcData)),"_self");
+        if (dataA.length == 0 || dataA[dataA.length-1]['question']) {
+          $$("table").add({"status": "1:待处理"});
+        }
+      };
       const columns = [
-        { id: 'question', header: ["问题",{content:"textFilter"}], fillspace: 2, editor:"text" },
-        { id: 'poster', header: ["提出人",{content:"selectFilter"}], fillspace: 1, editor:"text", sort:"string" },
-        { id: 'status', header: ["状态",{content:"selectFilter"}], fillspace: 1, editor:"select", options: ['1:待处理', '2:设计中，待开发', '3:开发中', '4:待确认', '5:已确认'], sort:"string"},
-        { id: 'comfirmer', header: ["确认人",{content:"selectFilter"}], fillspace: 1, editor:"text", sort:"string"} ];
+        { id:"index", header:"#", width: 50, sort:"int"},
+        { id: 'actions', header: "", width: 50, template:"<img class='delbtn'>"},
+        { id: 'question', header: ["问题",{content:"textFilter"}], fillspace: 4, editor:"text" },
+        { id: 'poster', header: ["提出人",{content:"selectFilter"}], width: 100, editor:"text", sort:"string" },
+        { id: 'status', header: ["状态",{content:"selectFilter"}], width: 150, editor:"select", options: ['1:待处理', '2:设计中，待开发', '3:开发中', '4:待确认', '5:已确认', '9:搁置'], sort:"string"},
+        { id: 'comfirmer', header: ["确认人",{content:"selectFilter"}], width: 100, editor:"text", sort:"string"} ];
       webix.ui({
         rows:[
             { view:"template", 
               type:"header",
-              template: title
+              template: title+" 需求列表",
             },
             { view:"datatable", 
               id: 'table',
               // autoConfig:true, 
               editable:true,
+              fixedRowHeight:false,
+              drag:true,
+              // editaction: "dblclick",
               columns,
               data,
+              onClick:{ 
+                "delbtn":function(e, id, trg){
+                  webix.message("Delete row: "+id);
+                  $$("table").remove(id);
+                  onDataChanged();
+                  return false; //here it blocks default behavior
+                }
+              },
+              on:{
+                "data->onStoreUpdated":function(){
+                  this.data.each(function(obj, i){
+                    obj.index = i+1;
+                  })
+                }
+              },
             },
-            {
-              view: "button",
-              id: 'addRowBtn',
-              value: '添加问题/需求',
-            }
         ]
       });
-      $$('addRowBtn').attachEvent("onItemClick", function(id, e){
-        $$("table").add({"status": "1:待处理"});
-      });
+      $$('table').adjustRowHeight("question");
       $$('table').attachEvent("onDataUpdate", function(id, data){
-        const srcData = {title: title, data: $$('table').serialize()};
-        window.open(urls[0]+"#"+LZString.compressToEncodedURIComponent(JSON.stringify(srcData)),"_self")
+        onDataChanged();
         return true;
       });
     </script>
